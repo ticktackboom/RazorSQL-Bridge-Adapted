@@ -13,7 +13,7 @@
 		
 		if ($testParameter == 'true')
 		{
-			if (extension_loaded('mysql'))
+			if (extension_loaded('mysqli'))
 			{
 				echo 'true';
 			}	
@@ -70,14 +70,12 @@
 		{
 			$port = '3306';
 		}
-		$server = $host . ':' . $port;
 		
-		$link = mysql_connect ($server, $user, $password);
+		$link = mysqli_connect ($host, $user, $password, $database, $port);
 		if (!$link)
 		{
-			die('|ERROR|Could not connect: ' . mysql_error());
+			die('|ERROR|Could not connect: ' . $link->error);
 		}
-		mysql_select_db($database);
 		
 		$state = '';
 		
@@ -103,7 +101,7 @@
 			$state = connectionGetMetaData($user);
 		}
 		
-		mysql_close ($link);
+		mysqli_close ($link);
 		
 		echo $state;
 	}
@@ -115,7 +113,8 @@
 	
 	function connectionGetMetaData($user)
 	{
-		$info = mysql_get_server_info();	
+		global $link;
+		$info = $link->server_info;	
 		$majorVersion = substr($info, 0, strpos($info, '.'));
 		
 		$minor = substr($info, strpos($info,'.')+1, strlen($info));
@@ -130,11 +129,12 @@
 	
 	function statementExecuteQuery($query, $fetchSize, $tableName, $fetchAll)
 	{	
+		global $link;
 		$query = str_replace("<r_newline>", "\n", $query);
-		$result = mysql_query($query);
+		$result = $link->query($query);
 		if (!$result) 
 		{
-			$message = '|ERROR|' . mysql_error();
+			$message = '|ERROR|' . $link->error;
 			return $message;
 		}
 		else
@@ -150,15 +150,15 @@
 			$values = '|VALUES|';
 			
 			$i = 0;
-			while ($i < mysql_num_fields($result))
+			while ($i < $result->field_count)
 			{
-				$meta = mysql_fetch_field($result, $i);
+				$meta = $result->fetch_field();
 				$columnNames .= $meta->name . '!~!';
 				$i = $i + 1;
 			}
 			$i = 0;
 			
-			while ( ($row = mysql_fetch_row($result)) && $i < $fetchSize) 
+			while ( ($row = $result->fetch_row()) && $i < $fetchSize) 
 			{
 				$count = count($row);
 				$y = 0;
@@ -173,29 +173,29 @@
 				$values .= '|END_ROW|';
 				$i = $i + 1;
 			}
-			mysql_free_result($result);
+			mysqli_free_result($result);
 		}
 		
 		$retValue = $columnNames . $values;
 		
 		if ($tableName != null)
 		{
-			$result = mysql_query('show columns from ' .$tableName);
+			$result = $link->query('show columns from ' .$tableName);
 			if ($result)
 			{
 				$columnNames = '|SHOW_NAMES|';
 				$values = '|SHOW_VALUES|';
 				
 				$i = 0;
-				while ($i < mysql_num_fields($result))
+				while ($i < $result->fetch_count)
 				{
-					$meta = mysql_fetch_field($result, $i);
+					$meta = $result->fetch_field();
 					$columnNames .= $meta->name . '!~!';
 					$i = $i + 1;
 				}
 				
 				$i = 0;
-				while ( ($row = mysql_fetch_row($result)) && $i < $fetchSize) 
+				while ( ($row = $result->fetch_row()) && $i < $fetchSize) 
 				{
 					$count = count($row);
 					$y = 0;
@@ -209,7 +209,7 @@
 					$i = $i + 1;
 				}
 				$retValue .= $columnNames . $values;
-				mysql_free_result($result);
+				mysqli_free_result($result);
 			}
 		}
 		return ($retValue);
@@ -217,15 +217,16 @@
 	
 	function statementExecuteUpdate ($query)
 	{
+		global $link;
 		$query = str_replace("<r_newline>", "\n", $query);
-		$result = mysql_query($query);
+		$result = $link->query($query);
 		if (!$result) 
 		{
-			$message = '|ERROR|' . mysql_error();
+			$message = '|ERROR|' . $link->error;
 			return $message;
 		}
 		
-		$message = '|UPDATED_ROWS|' . mysql_affected_rows();	
+		$message = '|UPDATED_ROWS|' . $link->affected_rows;	
 		return $message;
 	}
 	
